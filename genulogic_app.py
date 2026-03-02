@@ -12,8 +12,7 @@ if "GEMINI_API_KEY" in st.secrets:
 else:
     st.error("נא להגדיר GEMINI_API_KEY ב-Secrets של האפליקציה")
 
-model = genai.GenerativeModel('gemini-1.5-flash')
-
+model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
 st.markdown("""
     <style>
     .main { background-color: #F5F9FF; direction: rtl; text-align: right; }
@@ -61,3 +60,4 @@ if img_file1 and img_file2:
             
     except Exception as e:
         st.error(f"קרתה שגיאה בניתוח התמונה: {e}")
+
