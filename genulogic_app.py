@@ -1,102 +1,106 @@
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
-import time
+import random
 
-# --- הגדרות דף ועיצוב GenuLogic ---
+# --- הגדרות עיצוב GenuLogic ---
 st.set_page_config(page_title="GenuLogic - מלווה שיעור", layout="centered")
 
 st.markdown("""
     <style>
-    /* רקע Alice Blue עדין לפי הפרוטוקול */
-    .main { background-color: #F5F9FF; direction: rtl; }
-    .stButton>button { 
-        width: 100%; border-radius: 12px; height: 3.5em; 
-        background-color: #1E88E5; color: white; font-weight: bold; border: none;
-    }
+    .main { background-color: #F5F9FF; direction: rtl; font-family: 'Segoe UI', sans-serif; }
     .header-container {
         display: flex; justify-content: space-between; align-items: center;
-        padding: 10px 0; border-bottom: 2px solid #E3F2FD; margin-bottom: 30px;
+        padding: 10px 20px; border-bottom: 2px solid #E3F2FD; background-color: white;
     }
-    .brand-left { font-family: 'Segoe UI', sans-serif; color: #1565C0; font-weight: bold; }
-    .dept-right { color: #546E7A; font-size: 0.9em; font-family: 'Segoe UI', sans-serif; }
-    div[data-testid="stExpander"] { border: 1px solid #E3F2FD; background-color: white; }
+    .exercise-card {
+        background-color: white; border-radius: 15px; padding: 20px;
+        margin-bottom: 20px; border-right: 5px solid #1E88E5;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
+    .pedagogical-focus {
+        background-color: #E3F2FD; border-radius: 10px; padding: 10px;
+        font-size: 0.9em; margin-top: 10px; color: #1565C0;
+    }
+    .stButton>button { 
+        width: 100%; border-radius: 12px; height: 3.5em; 
+        background-color: #1E88E5; color: white; font-weight: bold;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- כותרת (Header) ---
+# --- Header ---
 st.markdown("""
     <div class="header-container">
-        <div class="brand-left">genu_logic</div>
-        <div class="dept-right">מחלקה פדגוגית</div>
+        <div style="color: #1565C0; font-weight: bold;">genu_logic</div>
+        <div style="color: #546E7A; font-size: 0.9em;">מחלקה פדגוגית</div>
     </div>
     """, unsafe_allow_html=True)
 
-# --- חיבור למוח (Gemini API) ---
-if "GEMINI_API_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-else:
-    st.error("נא להגדיר GEMINI_API_KEY ב-Secrets של Streamlit.")
-    st.stop()
-
-# שימוש במודל 2.0 פלאש - המהיר והחזק ביותר ל-Vision ב-2026
-model = genai.GenerativeModel('gemini-2.0-flash')
+# --- מנגנון רוטציית מפתחות (Anti-429) ---
+def get_model():
+    keys = st.secrets.get("GEMINI_KEYS", [])
+    if not keys:
+        st.error("לא הוגדרו מפתחות API ב-Secrets.")
+        st.stop()
+    
+    # בחירת מפתח רנדומלי כדי לפזר את העומס
+    random_key = random.choice(keys)
+    genai.configure(api_key=random_key)
+    return genai.GenerativeModel('gemini-2.0-flash')
 
 # --- ממשק משתמש ---
 st.title("שלום עופרי,")
 st.subheader("מה תרצה שנלמד היום?")
 
-# צילום עמודים (מצלמה נפתחת אוטומטית בסלולרי)
-col1, col2 = st.columns(2)
-with col1:
-    img1 = st.camera_input("עמוד תרגול 1")
-with col2:
-    img2 = st.camera_input("עמוד תרגול 2")
+img1 = st.camera_input("עמוד תרגול 1")
+img2 = st.camera_input("עמוד תרגול 2")
 
 if img1 and img2:
-    if st.button("צור תוכנית תרגול מותאמת"):
-        with st.status("סורק תרגילים ומנתח לוגיקה...", expanded=True) as status:
+    if st.button("בנה תוכנית תרגול מותאמת"):
+        with st.spinner("מנתח נתונים בשרת..."):
             try:
-                # המרת קבצים לאובייקטי תמונה
+                model = get_model()
                 image_parts = [Image.open(img1), Image.open(img2)]
                 
-                # הנחיה פדגוגית למוח בענן (The Engine)
+                # הנחיה מחמירה לפורמט ויזואלי ודיוק מתמטי
                 prompt = """
-                אתה מורה פרטי מומחה במתמטיקה העובד לפי פרוטוקול GenuLogic.
-                נתח את התמונות המצורפות ופעל לפי ההנחיות הבאות:
-                1. זהה את הנושא המתמטי המופיע בדפים.
-                2. בנה תוכנית תרגול מותאמת ל-45 דקות:
-                   - אם מדובר באלגברה: צור 7 תרגילים (שינוי מספרים מהמקור).
-                   - אם מדובר בבעיות מילוליות מורכבות: צור 3 תרגילים לכל היותר (שינוי דמויות/הקשר), 
-                     כאשר פתרון מלא לוקח כ-20 שורות.
-                3. עבור כל תרגיל, ציין 'דגש פדגוגי' אחד המבוסס על ניתוח טעויות נפוצות.
-                4. שפה וסגנון: אקדמי, מכבד ובגובה העיניים.
-                5. איסור מוחלט: אל תשתמש במילה 'מוקש'. השתמש במושג 'ניתוח טעות נפוצה' או 'דגש פדגוגי'.
-                6. שפה מכילה: השתמש בביטוי 'נרשמה שגיאה' במקום 'טעית'.
-                7. פלט: הצג את התרגילים בפורמט ברור ונוח לקריאה מהסלולרי.
+                פעל כסוכן פדגוגי בכיר ב-GenuLogic. נתח את הדפים המצורפים.
+                עליך להחזיר תגובה בפורמט Markdown ברור הכולל:
+                1. זיהוי מדויק של הנושא (למשל: משוואות מעריכיות).
+                2. יצירת תרגילים מותאמים (7 לאלגברה / 3 לבעיות מילוליות).
+                3. לכל תרגיל כתוב פתרון סופי בתוך בלוק קוד.
+                4. לכל תרגיל הוסף 'דגש פדגוגי' (שימוש במונח 'נרשמה שגיאה נפוצה').
+                5. השתמש ב-LaTeX עבור נוסחאות מתמטיות (למשל $x^2 + 5x + 6 = 0$).
+                
+                חשוב: ודא שהמספרים בתרגילים החדשים הגיוניים ויוצרים פתרונות נוחים ללמידה.
+                אל תשתמש במילה 'מוקש'.
                 """
                 
                 response = model.generate_content([prompt] + image_parts)
-                report_text = response.text
                 
-                status.update(label="הניתוח הושלם בהצלחה!", state="complete", expanded=False)
-                
-                # הצגת התוצאה
+                # הצגת התוצאה בתוך קונטיינר מעוצב
                 st.markdown("---")
-                st.markdown("### תוכנית השיעור שלך (45 דקות):")
-                st.write(report_text)
+                st.markdown("### תוכנית השיעור שנבנתה עבורך:")
                 
-                # שמירת דוח מקומי
-                st.session_state['last_report'] = report_text
-                
-                # כפתור סיום ושליחה לוואטסאפ (סימולציה)
-                if st.button("סיימתי תרגול! שלח דוח ביצועים לוואטסאפ"):
-                    st.balloons()
-                    st.success("הדוח נשלח לסוכן ה-WhatsApp. תרגול הבית (14 תרגילים) בדרך אליך!")
-                    
-            except Exception as e:
-                st.error(f"אירעה שגיאה בעיבוד הענן: {e}")
+                # פיצול התגובה לפי תרגילים (בהנחה שהמודל משתמש במספור)
+                exercises = response.text.split("תרגיל")
+                for ex in exercises[1:]: # דילוג על הפתיח
+                    st.markdown(f"""
+                    <div class="exercise-card">
+                        <strong>תרגיל {ex.splitlines()[0]}</strong>
+                        <p>{chr(10).join(ex.splitlines()[1:])}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-# סיומת הדף לפי הפרוטוקול
+                if st.button("סיימתי! שלח דוח ביצועים"):
+                    st.balloons()
+            
+            except Exception as e:
+                if "429" in str(e):
+                    st.error("עומס זמני על השרת (429). המערכת תנסה להחליף מפתח באופן אוטומטי, אנא נסה ללחוץ שוב בעוד כמה שניות.")
+                else:
+                    st.error(f"שגיאה בעיבוד: {e}")
+
 st.markdown("---")
-st.caption("GenuLogic OS | פתרונות למידה מתקדמים")
+st.caption("GenuLogic OS | פיתוח תוכניות למידה")
